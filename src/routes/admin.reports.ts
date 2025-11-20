@@ -12,27 +12,23 @@ router.get("/api/admin/reports/sales", async (req, res) => {
   try {
     const now = new Date();
     const month = Number(req.query.month) || now.getMonth() + 1;
-    const year = Number(req.query.year) || now.getFullYear();
-
-    // Usamos zona horaria local (Colombia) para que coincida con lo que ve el usuario
-    const tz = "America/Bogota";
+    const year  = Number(req.query.year)  || now.getFullYear();
 
     const rows = await prisma.$queryRaw<
       { day: number; total: number }[]
     >`
       SELECT
-        EXTRACT(DAY   FROM (o.date AT TIME ZONE ${tz}))::int                       AS day,
+        EXTRACT(DAY FROM o.date)::int                       AS day,
         COALESCE(SUM(oi.qty * oi.unit_price_cents), 0)::int AS total
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      WHERE EXTRACT(MONTH FROM (o.date AT TIME ZONE ${tz})) = ${month}
-        AND EXTRACT(YEAR  FROM (o.date AT TIME ZONE ${tz})) = ${year}
+      WHERE EXTRACT(MONTH FROM o.date) = ${month}
+        AND EXTRACT(YEAR  FROM o.date) = ${year}
       GROUP BY day
       ORDER BY day ASC;
     `;
 
-    // Etiquetas con el número de día tal cual (17, 18, 19, ...)
-    const labels = rows.map((r) => String(r.day));
+    const labels = rows.map((r) => String(r.day).padStart(2, "0"));
     const values = rows.map((r) => r.total);
 
     res.json({ labels, values });
@@ -49,7 +45,7 @@ router.get("/api/admin/reports/sales", async (req, res) => {
 router.get("/api/admin/reports/top-products", async (req, res) => {
   try {
     const month = req.query.month ? Number(req.query.month) : null;
-    const year = req.query.year ? Number(req.query.year) : null;
+    const year  = req.query.year  ? Number(req.query.year)  : null;
 
     type Row = { name: string; qty: number };
     let rows: Row[] = [];
@@ -58,7 +54,7 @@ router.get("/api/admin/reports/top-products", async (req, res) => {
       rows = await prisma.$queryRaw<Row[]>`
         SELECT
           COALESCE(oi.name, '(Sin nombre)') AS name,
-          COALESCE(SUM(oi.qty), 0)::int     AS qty
+          COALESCE(SUM(oi.qty),0)::int      AS qty
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         WHERE EXTRACT(YEAR  FROM o.date) = ${year}
@@ -71,7 +67,7 @@ router.get("/api/admin/reports/top-products", async (req, res) => {
       rows = await prisma.$queryRaw<Row[]>`
         SELECT
           COALESCE(oi.name, '(Sin nombre)') AS name,
-          COALESCE(SUM(oi.qty), 0)::int     AS qty
+          COALESCE(SUM(oi.qty),0)::int      AS qty
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         WHERE EXTRACT(YEAR FROM o.date) = ${year}
@@ -83,7 +79,7 @@ router.get("/api/admin/reports/top-products", async (req, res) => {
       rows = await prisma.$queryRaw<Row[]>`
         SELECT
           COALESCE(oi.name, '(Sin nombre)') AS name,
-          COALESCE(SUM(oi.qty), 0)::int     AS qty
+          COALESCE(SUM(oi.qty),0)::int      AS qty
         FROM order_items oi
         GROUP BY name
         ORDER BY qty DESC
